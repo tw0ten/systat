@@ -13,6 +13,7 @@ struct Stat {
     fetch: Box<dyn Fn() -> String>,
     interval: u8,
 }
+
 impl Stat {
     fn new(fetch: impl Fn() -> String + 'static, interval: u8) -> Self {
         Stat {
@@ -36,7 +37,6 @@ fn setbar(s: String) {
 
 fn main() {
     //i really dont know how rust works
-    //let sys: System = System::new();
 
     let mut stats: Vec<Stat> = vec![
         Stat::new(
@@ -58,7 +58,7 @@ fn main() {
                     "<RAM:{}",
                     (mem.total.as_u64() - mem.free.as_u64()) * 100 / mem.total.as_u64()
                 ),
-                Err(_) => String::from("<RAM>"),
+                Err(_) => String::from("<RAM:-"),
             },
             2,
         ),
@@ -78,7 +78,7 @@ fn main() {
             //CPU USAGE + TEMPERATURE
             move || match System::new().cpu_load_aggregate() {
                 Ok(cpu) => {
-                    thread::sleep(Duration::from_secs(1));
+                    thread::sleep(Duration::from_millis(900));
                     return format!(
                         "CPU:{}%{}°",
                         ((1.0 - cpu.done().unwrap().idle) * 100.0).round(),
@@ -87,7 +87,7 @@ fn main() {
                                 .arg("-c")
                                 .arg("sensors | grep Tctl: | awk '{print int($2);}'")
                                 .output()
-                                .expect("0")
+                                .expect("-")
                                 .stdout
                         )
                         .trim()
@@ -108,7 +108,7 @@ fn main() {
                             .arg("--format=csv,noheader,nounits")
                             .arg("--query-gpu=utilization.gpu")
                             .output()
-                            .expect("GPU")
+                            .expect("-")
                             .stdout
                     )
                     .trim(),
@@ -117,7 +117,7 @@ fn main() {
                             .arg("--format=csv,noheader,nounits")
                             .arg("--query-gpu=temperature.gpu")
                             .output()
-                            .expect("GPU")
+                            .expect("-")
                             .stdout
                     )
                     .trim()
@@ -141,52 +141,56 @@ fn main() {
         Stat::new(move || String::from(" \\"), 0),
         Stat::new(
             //BATTERY
-            move || {
-                let sys = System::new();
-                /*let ac;
-                match sys.on_ac_power() {
-                    Ok(power) => ac = power,
-                    Err(_) => {}
-                }*/
-                match sys.battery_life() {
-                    Ok(battery) => {
-                        if battery.remaining_capacity > 0.0 {
-                            if battery.remaining_capacity > 0.1 {
-                                if battery.remaining_capacity > 0.2 {
-                                    if battery.remaining_capacity > 0.3 {
-                                        if battery.remaining_capacity > 0.4 {
-                                            if battery.remaining_capacity > 0.5 {
-                                                if battery.remaining_capacity > 0.6 {
-                                                    if battery.remaining_capacity > 0.7 {
-                                                        if battery.remaining_capacity > 0.8 {
-                                                            if battery.remaining_capacity > 0.9 {
-                                                                return String::from("󰁹");
-                                                            }
-                                                            return String::from("󰂂");
-                                                        }
-                                                        return String::from("󰂁");
-                                                    }
-                                                    return String::from("󰂀");
-                                                }
-                                                return String::from("󰁿");
-                                            }
-                                            return String::from("󰁾");
-                                        }
-                                        return String::from("󰁽");
-                                    }
-                                    return String::from("󰁼");
-                                }
-                                return String::from("󰁻");
-                            }
-                            return String::from("󰁺");
-                        } else {
-                            return String::from("󰂎");
-                        }
+            move || match System::new().battery_life() {
+                Ok(battery) => {
+                    if battery.remaining_capacity > 0.9 {
+                        return String::from("󰁹");
                     }
-                    Err(_) => String::from("󰂎"),
+                    if battery.remaining_capacity > 0.8 {
+                        return String::from("󰂂");
+                    }
+                    if battery.remaining_capacity > 0.7 {
+                        return String::from("󰂁");
+                    }
+                    if battery.remaining_capacity > 0.6 {
+                        return String::from("󰂀");
+                    }
+                    if battery.remaining_capacity > 0.5 {
+                        return String::from("󰁿");
+                    }
+                    if battery.remaining_capacity > 0.4 {
+                        return String::from("󰁾");
+                    }
+                    if battery.remaining_capacity > 0.3 {
+                        return String::from("󰁽");
+                    }
+                    if battery.remaining_capacity > 0.2 {
+                        return String::from("󰁼");
+                    }
+                    if battery.remaining_capacity > 0.1 {
+                        return String::from("󰁻");
+                    }
+                    if battery.remaining_capacity > 0.05 {
+                        return String::from("󰁺");
+                    }
+                    String::from("󰂎")
                 }
+                Err(_) => String::from("󰂎"),
             },
             10,
+        ),
+        Stat::new(
+            //AC
+            move || match System::new().on_ac_power() {
+                Ok(power) => {
+                    if power {
+                        return String::new();
+                    }
+                    String::from("-")
+                }
+                Err(_) => String::from("?"),
+            },
+            5,
         ),
         Stat::new(move || String::from("|"), 0),
         Stat::new(
@@ -194,7 +198,7 @@ fn main() {
             move || {
                 String::from_utf8_lossy(&Command::new("sh")
                 .arg("-c")
-                .arg("amixer sget Master | awk -F\"[][]\" '/Left:/ { gsub(\"%\",\"\"); if($4==\"on\"){ if($2 <= 25) print \"󰕿\"; else if($2 <= 75) print \"󰖀\"; else if($2<=100) print \"󰕾\"; } else print \"󰝟\"; }'")
+                .arg("amixer sget Master | awk -F\"[][]\" '/Left:/ { gsub(\"%\",\"\"); if($4==\"on\"){ if($2 <= 25) print \"󰕿\"; else if($2 <= 75) print \"󰖀\"; else if($2<=100) print \"󰕾\"; } else print \"󰝟\"; }'") //todo: parse this
                 .output()
                 .expect("󰝟").stdout).trim().to_string()
             },
@@ -205,7 +209,7 @@ fn main() {
             move || {
                 String::from_utf8_lossy(&Command::new("sh")
                 .arg("-c")
-                .arg("xbacklight -get | awk '{ if($1 <= 10) print \"󱩎\"; else if($1 <= 20) print \"󱩏\"; else if($1<=30) print \"󱩐\"; else if($1<=40) print \"󱩑\"; else if($1<=50) print \"󱩒\"; else if($1<=60) print \"󱩓\"; else if($1<=70) print \"󱩔\"; else if($1<=80) print \"󱩕\"; else if($1<=90) print \"󱩖\"; else if($1<=100) print \"󰛨\"; }'")
+                .arg("xbacklight -get | awk '{ if($1 <= 10) print \"󱩎\"; else if($1 <= 20) print \"󱩏\"; else if($1<=30) print \"󱩐\"; else if($1<=40) print \"󱩑\"; else if($1<=50) print \"󱩒\"; else if($1<=60) print \"󱩓\"; else if($1<=70) print \"󱩔\"; else if($1<=80) print \"󱩕\"; else if($1<=90) print \"󱩖\"; else if($1<=100) print \"󰛨\"; }'") //todo: parse this
                 .output()
                 .expect("󰛨").stdout).trim().to_string()
             },
@@ -226,34 +230,29 @@ fn main() {
                     let num: Result<u8, _> = s[..s.len() - 1].parse();
                     match num {
                         Ok(e) => {
-                            if e > 0 {
-                                if e > 23 {
-                                    if e > 46 {
-                                        return String::from("󰤥");
-                                    } else {
-                                        return String::from("󰤢");
-                                    }
-                                } else {
-                                    return String::from("󰤟");
-                                }
-                            } else {
-                                return String::from("󰤯");
+                            if e > 46 {
+                                return String::from("󰤥");
                             }
+                            if e > 23 {
+                                return String::from("󰤢");
+                            }
+                            if e > 0 {
+                                return String::from("󰤟");
+                            }
+                            String::from("󰤯")
                         }
-                        Err(_) => {}
+                        Err(_) => String::from("󰤯"),
                     }
-                    String::from("󰤯")
                 }
                 Err(_) => String::from("󰤯"),
             },
             5,
         ),
-        /*Stat::new( //BLUETOOTH
-            move || {
-                String::from("")
-            },
+        Stat::new(
+            //BLUETOOTH
+            move || String::from(""),
             5,
-        ),*/
+        ),
         Stat::new(move || String::from("|"), 0),
         Stat::new(
             //KEYBOARD
@@ -288,27 +287,33 @@ fn main() {
         ),
     ];
 
-    for stat in &mut stats {
-        if stat.interval == 0 {
-            stat.set((stat.fetch)());
-        }
-    }
-    let mut t = 0;
+    let mut t: i64 = 0;
     let mut i: u8 = 0;
     loop {
+        /*if *upd.get_mut() {
+            let mut s: String = String::new();
+            for stat in &mut stats {
+                if stat.interval <= 0 {
+                    stat.set((stat.fetch)());
+                }
+                s += &stat.value;
+            }
+            setbar(s);
+            upd = AtomicBool::new(false);
+        }*/
         if t + 2 > Utc::now().timestamp() {
             continue;
         }
         t = Utc::now().timestamp();
 
+        let mut s: String = String::new();
         for stat in &mut stats {
             if stat.interval > 0 && i % stat.interval == 0 {
                 stat.set((stat.fetch)());
             }
+            s += &stat.value;
         }
         i += 1;
-        let f: Vec<String> = stats.iter().map(|x| format!("{}", x.value)).collect();
-        setbar(f.join(""));
-        //thread::sleep(Duration::from_secs(1));//replace with time continue
+        setbar(s);
     }
 }
