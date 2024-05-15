@@ -32,7 +32,7 @@ fn setbar(s: String) {
         .arg("-name")
         .arg(s)
         .output()
-        .expect("failed to execute process");
+        .expect("failed to $xsetroot -name \"...\"");
 }
 
 fn main() {
@@ -82,15 +82,14 @@ fn main() {
                     return format!(
                         "CPU:{}%{}°",
                         ((1.0 - cpu.done().unwrap().idle) * 100.0).round(),
-                        String::from_utf8_lossy(
-                            &Command::new("sh")
-                                .arg("-c")
-                                .arg("sensors | grep Tctl: | awk '{print int($2);}'")
-                                .output()
-                                .expect("-")
-                                .stdout
-                        )
-                        .trim()
+                        match Command::new("sh")
+                            .arg("-c")
+                            .arg("sensors | grep Tctl: | awk '{print int($2);}'")
+                            .output()
+                        {
+                            Ok(s) => String::from_utf8_lossy(&s.stdout).trim().to_string(),
+                            Err(_) => String::from("-"),
+                        }
                     );
                 }
                 Err(_) => String::from("CPU"),
@@ -103,24 +102,22 @@ fn main() {
             move || {
                 format!(
                     "GPU:{}%{}°",
-                    String::from_utf8_lossy(
-                        &Command::new("nvidia-smi")
-                            .arg("--format=csv,noheader,nounits")
-                            .arg("--query-gpu=utilization.gpu")
-                            .output()
-                            .expect("-")
-                            .stdout
-                    )
-                    .trim(),
-                    String::from_utf8_lossy(
-                        &Command::new("nvidia-smi")
-                            .arg("--format=csv,noheader,nounits")
-                            .arg("--query-gpu=temperature.gpu")
-                            .output()
-                            .expect("-")
-                            .stdout
-                    )
-                    .trim()
+                    match Command::new("nvidia-smi")
+                        .arg("--format=csv,noheader,nounits")
+                        .arg("--query-gpu=utilization.gpu")
+                        .output()
+                    {
+                        Ok(s) => String::from_utf8_lossy(&s.stdout).trim().to_string(),
+                        Err(_) => String::from("-"),
+                    },
+                    match Command::new("nvidia-smi")
+                        .arg("--format=csv,noheader,nounits")
+                        .arg("--query-gpu=temperature.gpu")
+                        .output()
+                    {
+                        Ok(s) => String::from_utf8_lossy(&s.stdout).trim().to_string(),
+                        Err(_) => String::from("-"),
+                    }
                 )
             },
             2,
@@ -196,22 +193,56 @@ fn main() {
         Stat::new(
             //VOLUME
             move || {
-                String::from_utf8_lossy(&Command::new("sh")
-                .arg("-c")
-                .arg("amixer sget Master | awk -F\"[][]\" '/Left:/ { gsub(\"%\",\"\"); if($4==\"on\"){ if($2 <= 25) print \"󰕿\"; else if($2 <= 75) print \"󰖀\"; else if($2<=100) print \"󰕾\"; } else print \"󰝟\"; }'") //todo: parse this
-                .output()
-                .expect("󰝟").stdout).trim().to_string()
+                match Command::new("sh")
+                    .arg("-c")
+                    .arg("amixer sget Master | awk -F\"[][]\" '/Left:/ { gsub(\"%\",\"\"); if($4==\"on\"){ if($2 <= 25) print \"󰕿\"; else if($2 <= 75) print \"󰖀\"; else if($2<=100) print \"󰕾\"; } else print \"󰝟\"; }'")
+                    .output(){
+                    Ok(s) => String::from_utf8_lossy(&s.stdout).trim().to_string(),
+                    Err(_) => String::from("󰝟")
+                }
             },
             10,
         ),
         Stat::new(
             //BRIGHTNESS
             move || {
-                String::from_utf8_lossy(&Command::new("sh")
-                .arg("-c")
-                .arg("xbacklight -get | awk '{ if($1 <= 10) print \"󱩎\"; else if($1 <= 20) print \"󱩏\"; else if($1<=30) print \"󱩐\"; else if($1<=40) print \"󱩑\"; else if($1<=50) print \"󱩒\"; else if($1<=60) print \"󱩓\"; else if($1<=70) print \"󱩔\"; else if($1<=80) print \"󱩕\"; else if($1<=90) print \"󱩖\"; else if($1<=100) print \"󰛨\"; }'") //todo: parse this
-                .output()
-                .expect("󰛨").stdout).trim().to_string()
+                match Command::new("sh")
+                    .arg("-c")
+                    .arg("xbacklight -get | awk '{ split($0, o, \".\"); print o[1]; }'")
+                    .output(){
+                    Ok(s) => {
+                        let n: u8 = String::from_utf8_lossy(&s.stdout).trim().to_string().parse().expect("failed to parse brightness value");
+                        if n > 90 {
+                            return String::from("󰛨");
+                        }
+                        if n > 80 {
+                            return String::from("󱩖");
+                        }
+                        if n > 70 {
+                            return String::from("󱩕");
+                        }
+                        if n > 60 {
+                            return String::from("󱩔");
+                        }
+                        if n > 50 {
+                            return String::from("󱩓");
+                        }
+                        if n > 40 {
+                            return String::from("󱩒");
+                        }
+                        if n > 30 {
+                            return String::from("󱩑");
+                        }
+                        if n > 20 {
+                            return String::from("󱩐");
+                        }
+                        if n > 10 {
+                            return String::from("󱩏");
+                        }
+                        String::from("󱩎")
+                    },
+                    Err(_) => String::from("󱩎")
+                }
             },
             10,
         ),
@@ -230,10 +261,13 @@ fn main() {
                     let num: Result<u8, _> = s[..s.len() - 1].parse();
                     match num {
                         Ok(e) => {
-                            if e > 46 {
+                            if e > 50 {
+                                return String::from("󰤨");
+                            }
+                            if e > 33 {
                                 return String::from("󰤥");
                             }
-                            if e > 23 {
+                            if e > 16 {
                                 return String::from("󰤢");
                             }
                             if e > 0 {
@@ -250,37 +284,45 @@ fn main() {
         ),
         Stat::new(
             //BLUETOOTH
-            move || String::from(""),
-            5,
+            move || match Command::new("sh")
+                .arg("-c")
+                .arg(
+                    "rfkill list bluetooth | grep -qo \"Soft blocked: no\" && echo '󰂯' || echo '󰂲'",
+                )
+                .output()
+            {
+                Ok(s) => String::from_utf8_lossy(&s.stdout).trim().to_string(),
+                Err(_) => String::new(),
+            },
+            10,
         ),
         Stat::new(move || String::from("|"), 0),
         Stat::new(
             //KEYBOARD
-            move || {
-                String::from_utf8_lossy(
-                    &Command::new("sh")
-                        .arg("-c")
-                        .arg("xkb-switch | cut -d '(' -f 1")
-                        .output()
-                        .expect("un")
-                        .stdout,
-                )
-                .trim()
-                .to_string()
+            move || match Command::new("sh")
+                .arg("-c")
+                .arg("xkb-switch | cut -d '(' -f 1")
+                .output()
+            {
+                Ok(s) => String::from_utf8_lossy(&s.stdout).trim().to_string(),
+                Err(_) => String::from("--"),
             },
             10,
         ),
         Stat::new(move || String::from(" \\"), 0),
         Stat::new(
+            //USER@HOST
             move || {
                 format!(
                     "{}@{}",
-                    String::from_utf8_lossy(&Command::new("whoami").output().expect("").stdout)
-                        .trim(),
-                    String::from_utf8_lossy(
-                        &Command::new("uname").arg("-n").output().expect("").stdout
-                    )
-                    .trim()
+                    match Command::new("whoami").output() {
+                        Ok(s) => String::from_utf8_lossy(&s.stdout).trim().to_string(),
+                        Err(_) => String::from("user"),
+                    },
+                    match Command::new("uname").arg("-n").output() {
+                        Ok(s) => String::from_utf8_lossy(&s.stdout).trim().to_string(),
+                        Err(_) => String::from("host"),
+                    }
                 )
             },
             0,
@@ -289,18 +331,23 @@ fn main() {
 
     let mut t: i64 = 0;
     let mut i: u8 = 0;
+    for stat in &mut stats {
+        if stat.interval <= 0 {
+            stat.set((stat.fetch)());
+        }
+    }
     loop {
-        /*if *upd.get_mut() {
-            let mut s: String = String::new();
-            for stat in &mut stats {
-                if stat.interval <= 0 {
-                    stat.set((stat.fetch)());
-                }
-                s += &stat.value;
-            }
-            setbar(s);
-            upd = AtomicBool::new(false);
-        }*/
+        // if *upd.get_mut() {
+        //     let mut s: String = String::new();
+        //     for stat in &mut stats {
+        //         if stat.interval <= 0 {
+        //             stat.set((stat.fetch)());
+        //         }
+        //         s += &stat.value;
+        //     }
+        //     setbar(s);
+        //     upd = AtomicBool::new(false);
+        // }
         if t + 2 > Utc::now().timestamp() {
             continue;
         }
