@@ -8,24 +8,8 @@ use std::thread;
 use std::time::Duration;
 use systemstat::{Platform, System};
 
-struct Stat {
-    value: String,
-    fetch: Box<dyn Fn() -> String>,
-    interval: u8,
-}
-
-impl Stat {
-    fn new(fetch: impl Fn() -> String + 'static, interval: u8) -> Self {
-        Stat {
-            value: String::new(),
-            fetch: Box::new(fetch),
-            interval,
-        }
-    }
-    fn set(&mut self, val: String) {
-        self.value = val;
-    }
-}
+mod stat;
+use stat::Stat;
 
 fn setbar(s: String) {
     Command::new("xsetroot")
@@ -36,12 +20,12 @@ fn setbar(s: String) {
 }
 
 fn main() {
-    //i really dont know how rust works
+    let sys: System = System::new();
 
     let mut stats: Vec<Stat> = vec![
         Stat::new(
             //MOUNT
-            move || match System::new().mount_at("/") {
+            |sys| match sys.mount_at("/") {
                 Ok(mount) => {
                     let s = mount.avail.to_string();
                     return format!("(MNT:{}G)", s[..s.len() - 3].to_string());
@@ -50,10 +34,10 @@ fn main() {
             },
             30,
         ),
-        Stat::new(move || String::from(" "), 0),
+        Stat::new(|_| String::from(" "), 0),
         Stat::new(
             //RAM
-            move || match System::new().memory() {
+            |sys| match sys.memory() {
                 Ok(mem) => format!(
                     "<RAM:{}",
                     (mem.total.as_u64() - mem.free.as_u64()) * 100 / mem.total.as_u64()
@@ -64,7 +48,7 @@ fn main() {
         ),
         Stat::new(
             //SWAP
-            move || match System::new().swap() {
+            |sys| match sys.swap() {
                 Ok(swap) => format!(
                     ":{}%>",
                     (swap.total.as_u64() - swap.free.as_u64()) * 100 / swap.total.as_u64()
@@ -73,12 +57,12 @@ fn main() {
             },
             4,
         ),
-        Stat::new(move || String::from(" {"), 0),
+        Stat::new(|_| String::from(" {"), 0),
         Stat::new(
             //CPU USAGE + TEMPERATURE
-            move || match System::new().cpu_load_aggregate() {
+            |sys| match sys.cpu_load_aggregate() {
                 Ok(cpu) => {
-                    thread::sleep(Duration::from_millis(900));
+                    thread::sleep(Duration::from_millis(500));
                     return format!(
                         "CPU:{}%{}°",
                         ((1.0 - cpu.done().unwrap().idle) * 100.0).round(),
@@ -96,10 +80,10 @@ fn main() {
             },
             2,
         ),
-        Stat::new(move || String::from(" "), 0),
+        Stat::new(|_| String::from(" "), 0),
         Stat::new(
             //GPU USAGE + TEMPERATURE
-            move || {
+            |_| {
                 format!(
                     "GPU:{}%{}°",
                     match Command::new("nvidia-smi")
@@ -122,10 +106,10 @@ fn main() {
             },
             2,
         ),
-        Stat::new(move || String::from("} "), 0),
+        Stat::new(|_| String::from("} "), 0),
         Stat::new(
             //DATE & TIME
-            move || {
+            |_| {
                 let t = Local::now();
                 return format!(
                     "[{}.{}]",
@@ -135,10 +119,10 @@ fn main() {
             },
             1,
         ),
-        Stat::new(move || String::from(" \\"), 0),
+        Stat::new(|_| String::from(" \\"), 0),
         Stat::new(
             //BATTERY
-            move || match System::new().battery_life() {
+            |sys| match sys.battery_life() {
                 Ok(battery) => {
                     if battery.remaining_capacity > 0.9 {
                         return String::from("󰁹");
@@ -178,7 +162,7 @@ fn main() {
         ),
         Stat::new(
             //AC
-            move || match System::new().on_ac_power() {
+            |sys| match sys.on_ac_power() {
                 Ok(power) => {
                     if power {
                         return String::new();
@@ -189,10 +173,10 @@ fn main() {
             },
             5,
         ),
-        Stat::new(move || String::from("|"), 0),
+        Stat::new(|_| String::from("|"), 0),
         Stat::new(
             //VOLUME
-            move || {
+            |_| {
                 match Command::new("sh")
                     .arg("-c")
                     .arg("amixer sget Master | awk -F\"[][]\" '/Left:/ { gsub(\"%\",\"\"); if($4==\"on\"){ if($2 <= 25) print \"󰕿\"; else if($2 <= 75) print \"󰖀\"; else if($2<=100) print \"󰕾\"; } else print \"󰝟\"; }'")
@@ -205,7 +189,7 @@ fn main() {
         ),
         Stat::new(
             //BRIGHTNESS
-            move || {
+            |_| {
                 match Command::new("sh")
                     .arg("-c")
                     .arg("xbacklight -get | awk '{ split($0, o, \".\"); print o[1]; }'")
@@ -246,10 +230,10 @@ fn main() {
             },
             10,
         ),
-        Stat::new(move || String::from("|"), 0),
+        Stat::new(|_| String::from("|"), 0),
         Stat::new(
             //WIFI
-            move || match File::open("/proc/net/wireless") {
+            |_| match File::open("/proc/net/wireless") {
                 Ok(mut file) => {
                     let mut contents = String::new();
                     let _ = file.read_to_string(&mut contents);
@@ -282,24 +266,24 @@ fn main() {
             },
             5,
         ),
-        Stat::new(
-            //BLUETOOTH
-            move || match Command::new("sh")
-                .arg("-c")
-                .arg(
-                    "rfkill list bluetooth | grep -qo \"Soft blocked: no\" && echo '󰂯' || echo '󰂲'",
-                )
-                .output()
-            {
-                Ok(s) => String::from_utf8_lossy(&s.stdout).trim().to_string(),
-                Err(_) => String::new(),
-            },
-            10,
-        ),
-        Stat::new(move || String::from("|"), 0),
+        // Stat::new(
+        //     //BLUETOOTH
+        //     |_| match Command::new("sh")
+        //         .arg("-c")
+        //         .arg(
+        //             "rfkill list bluetooth | grep -qo \"Soft blocked: no\" && echo '󰂯' || echo '󰂲'",
+        //         )
+        //         .output()
+        //     {
+        //         Ok(s) => String::from_utf8_lossy(&s.stdout).trim().to_string(),
+        //         Err(_) => String::new(),
+        //     },
+        //     10,
+        // ),
+        Stat::new(|_| String::from("|"), 0),
         Stat::new(
             //KEYBOARD
-            move || match Command::new("sh")
+            |_| match Command::new("sh")
                 .arg("-c")
                 .arg("xkb-switch | cut -d '(' -f 1")
                 .output()
@@ -309,10 +293,10 @@ fn main() {
             },
             10,
         ),
-        Stat::new(move || String::from(" \\"), 0),
+        Stat::new(|_| String::from(" \\"), 0),
         Stat::new(
             //USER@HOST
-            move || {
+            |_| {
                 format!(
                     "{}@{}",
                     match Command::new("whoami").output() {
@@ -331,34 +315,26 @@ fn main() {
 
     let mut t: i64 = 0;
     let mut i: u8 = 0;
+
+    //fetch one time Stats
     for stat in &mut stats {
-        if stat.interval <= 0 {
-            stat.set((stat.fetch)());
+        if stat.i <= 0 {
+            stat.fetch(&sys);
         }
     }
+
     loop {
-        // if *upd.get_mut() {
-        //     let mut s: String = String::new();
-        //     for stat in &mut stats {
-        //         if stat.interval <= 0 {
-        //             stat.set((stat.fetch)());
-        //         }
-        //         s += &stat.value;
-        //     }
-        //     setbar(s);
-        //     upd = AtomicBool::new(false);
-        // }
-        if t + 2 > Utc::now().timestamp() {
+        if t + 1 > Utc::now().timestamp() {
             continue;
         }
         t = Utc::now().timestamp();
 
         let mut s: String = String::new();
         for stat in &mut stats {
-            if stat.interval > 0 && i % stat.interval == 0 {
-                stat.set((stat.fetch)());
+            if stat.i > 0 && i % stat.i == 0 {
+                stat.fetch(&sys);
             }
-            s += &stat.value;
+            s += &stat.s;
         }
         i += 1;
         setbar(s);
