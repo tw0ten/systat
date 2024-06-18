@@ -123,39 +123,19 @@ fn main() {
         Stat::new(
             //BATTERY
             |sys| match sys.battery_life() {
-                Ok(battery) => {
-                    if battery.remaining_capacity > 0.9 {
-                        return String::from("󰁹");
-                    }
-                    if battery.remaining_capacity > 0.8 {
-                        return String::from("󰂂");
-                    }
-                    if battery.remaining_capacity > 0.7 {
-                        return String::from("󰂁");
-                    }
-                    if battery.remaining_capacity > 0.6 {
-                        return String::from("󰂀");
-                    }
-                    if battery.remaining_capacity > 0.5 {
-                        return String::from("󰁿");
-                    }
-                    if battery.remaining_capacity > 0.4 {
-                        return String::from("󰁾");
-                    }
-                    if battery.remaining_capacity > 0.3 {
-                        return String::from("󰁽");
-                    }
-                    if battery.remaining_capacity > 0.2 {
-                        return String::from("󰁼");
-                    }
-                    if battery.remaining_capacity > 0.1 {
-                        return String::from("󰁻");
-                    }
-                    if battery.remaining_capacity > 0.05 {
-                        return String::from("󰁺");
-                    }
-                    String::from("󰂎")
-                }
+                Ok(battery) => match battery.remaining_capacity {
+                    0.9..=1.0 => String::from("󰁹"),
+                    0.8..=0.9 => String::from("󰂂"),
+                    0.7..=0.8 => String::from("󰂁"),
+                    0.6..=0.7 => String::from("󰂀"),
+                    0.5..=0.6 => String::from("󰁿"),
+                    0.4..=0.5 => String::from("󰁾"),
+                    0.3..=0.4 => String::from("󰁽"),
+                    0.2..=0.3 => String::from("󰁼"),
+                    0.1..=0.2 => String::from("󰁻"),
+                    0.0..=0.1 => String::from("󰁺"),
+                    _ => String::from("󰂎"),
+                },
                 Err(_) => String::from("󰂎"),
             },
             10,
@@ -189,44 +169,34 @@ fn main() {
         ),
         Stat::new(
             //BRIGHTNESS
-            |_| {
-                match Command::new("sh")
-                    .arg("-c")
-                    .arg("xbacklight -get | awk '{ split($0, o, \".\"); print o[1]; }'")
-                    .output(){
-                    Ok(s) => {
-                        let n: u8 = String::from_utf8_lossy(&s.stdout).trim().to_string().parse().expect("failed to parse brightness value");
-                        if n > 90 {
-                            return String::from("󰛨");
-                        }
-                        if n > 80 {
-                            return String::from("󱩖");
-                        }
-                        if n > 70 {
-                            return String::from("󱩕");
-                        }
-                        if n > 60 {
-                            return String::from("󱩔");
-                        }
-                        if n > 50 {
-                            return String::from("󱩓");
-                        }
-                        if n > 40 {
-                            return String::from("󱩒");
-                        }
-                        if n > 30 {
-                            return String::from("󱩑");
-                        }
-                        if n > 20 {
-                            return String::from("󱩐");
-                        }
-                        if n > 10 {
-                            return String::from("󱩏");
-                        }
-                        String::from("󱩎")
-                    },
-                    Err(_) => String::from("󱩎")
+            |_| match Command::new("sh")
+                .arg("-c")
+                .arg("xbacklight -get | awk '{ split($0, o, \".\"); print o[1]; }'")
+                .output()
+            {
+                Ok(s) => {
+                    match String::from_utf8_lossy(&s.stdout)
+                        .trim()
+                        .to_string()
+                        .parse::<u8>()
+                    {
+                        Ok(n) => match n {
+                            91..=100 => String::from("󰛨"),
+                            81..=90 => String::from("󱩖"),
+                            71..=80 => String::from("󱩕"),
+                            61..=70 => String::from("󱩔"),
+                            51..=60 => String::from("󱩓"),
+                            41..=50 => String::from("󱩒"),
+                            31..=40 => String::from("󱩑"),
+                            21..=30 => String::from("󱩐"),
+                            11..=20 => String::from("󱩏"),
+                            1..=10 => String::from("󱩎"),
+                            _ => String::from("󰛩"),
+                        },
+                        Err(_) => String::from("󰛩"),
+                    }
                 }
+                Err(_) => String::from("󰛩"),
             },
             10,
         ),
@@ -266,20 +236,11 @@ fn main() {
             },
             5,
         ),
-        // Stat::new(
-        //     //BLUETOOTH
-        //     |_| match Command::new("sh")
-        //         .arg("-c")
-        //         .arg(
-        //             "rfkill list bluetooth | grep -qo \"Soft blocked: no\" && echo '󰂯' || echo '󰂲'",
-        //         )
-        //         .output()
-        //     {
-        //         Ok(s) => String::from_utf8_lossy(&s.stdout).trim().to_string(),
-        //         Err(_) => String::new(),
-        //     },
-        //     10,
-        // ),
+        Stat::new(
+            //BLUETOOTH
+            |_| String::from("󰂯"),
+            10,
+        ),
         Stat::new(|_| String::from("|"), 0),
         Stat::new(
             //KEYBOARD
@@ -316,7 +277,6 @@ fn main() {
     let mut t: i64 = 0;
     let mut i: u8 = 0;
 
-    //fetch one time Stats
     for stat in &mut stats {
         if stat.i <= 0 {
             stat.fetch(&sys);
@@ -336,7 +296,7 @@ fn main() {
             }
             s += &stat.s;
         }
-        i += 1;
+        i = i.wrapping_add(1);
         setbar(s);
     }
 }
