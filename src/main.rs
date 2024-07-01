@@ -11,13 +11,7 @@ use systemstat::{Platform, System};
 mod stat;
 use stat::Stat;
 
-fn setbar(s: String) {
-    Command::new("xsetroot")
-        .arg("-name")
-        .arg(s)
-        .output()
-        .expect("failed to $xsetroot -name \"...\"");
-}
+static mut S: i8 = 0;
 
 fn main() {
     let sys: System = System::new();
@@ -165,7 +159,7 @@ fn main() {
                     Err(_) => String::from("󰝟")
                 }
             },
-            10,
+            -1,
         ),
         Stat::new(
             //BRIGHTNESS
@@ -198,7 +192,7 @@ fn main() {
                 }
                 Err(_) => String::from("󰛩"),
             },
-            10,
+            -2,
         ),
         Stat::new(|_| String::from("|"), 0),
         Stat::new(
@@ -252,7 +246,7 @@ fn main() {
                 Ok(s) => String::from_utf8_lossy(&s.stdout).trim().to_string(),
                 Err(_) => String::from("--"),
             },
-            10,
+            -3,
         ),
         Stat::new(|_| String::from(" \\"), 0),
         Stat::new(
@@ -274,16 +268,37 @@ fn main() {
         ),
     ];
 
-    let mut t: i64 = 0;
-    let mut i: u8 = 0;
-
     for stat in &mut stats {
         if stat.i <= 0 {
             stat.fetch(&sys);
         }
     }
 
+    let mut t: i64 = 0;
+    let mut i: u8 = 0;
+
+    fn setroot(s: String) {
+        Command::new("xsetroot")
+            .arg("-name")
+            .arg(s)
+            .output()
+            .expect("failed to $xsetroot -name \"...\"");
+    }
+
     loop {
+        let sig: i8 = unsafe { S };
+        if sig != 0 {
+            unsafe { S = 0 };
+            let mut s: String = String::new();
+            for stat in &mut stats {
+                if stat.i == sig {
+                    stat.fetch(&sys);
+                }
+                s += &stat.s;
+            }
+            setroot(s);
+        }
+
         if t + 1 > Utc::now().timestamp() {
             continue;
         }
@@ -291,12 +306,12 @@ fn main() {
 
         let mut s: String = String::new();
         for stat in &mut stats {
-            if stat.i > 0 && i % stat.i == 0 {
+            if stat.i > 0 && i % stat.i as u8 == 0 {
                 stat.fetch(&sys);
             }
             s += &stat.s;
         }
         i = i.wrapping_add(1);
-        setbar(s);
+        setroot(s);
     }
 }
