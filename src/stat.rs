@@ -15,12 +15,8 @@ const SUBPROCESS_NAME: &str = "systat-subprocess";
 
 impl Stat {
     fn spawn_process(i: i8) -> Child {
-        Command::new("sh")
-            .arg("-c")
-            .arg(format!(
-                "export PROCESS_NAME={}{}; trap 'exit' SIGTERM; while true; do wait; done",
-                SUBPROCESS_NAME, i
-            ))
+        Command::new("dummy")
+            .arg(format!("{}{}", SUBPROCESS_NAME, i))
             .spawn()
             .expect(&format!("couldnt start {}{}", SUBPROCESS_NAME, i))
     }
