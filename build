@@ -2,3 +2,4 @@
 cargo build -r
 gcc -o dummy dummy.c
 sudo mv dummy /bin
+sudo mv target/release/systat /usr/bin
