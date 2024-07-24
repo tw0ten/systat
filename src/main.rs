@@ -15,7 +15,6 @@ static mut S: i8 = 0;
 
 fn main() {
     let sys: System = System::new();
-
     let mut stats: Vec<Stat> = vec![
         Stat::new(
             //MOUNT
