@@ -285,6 +285,7 @@ fn main() {
     }
 
     loop {
+        thread::sleep(Duration::from_millis(200));
         let sig: i8 = unsafe { S };
         if sig != 0 {
             unsafe { S = 0 };
