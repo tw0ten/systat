@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 cargo build -r
 gcc -o dummy dummy.c
 sudo mv dummy /bin
