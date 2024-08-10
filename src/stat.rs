@@ -1,5 +1,7 @@
-use std::process::{Child, Command};
-use std::thread;
+use std::{
+    process::{Child, Command},
+    thread,
+};
 use systemstat::System;
 
 use crate::S;
@@ -10,9 +12,9 @@ pub struct Stat {
     pub i: i8,
 }
 
-fn spawn_process(i: i8) -> Child {
+fn spawn(i: i8) -> Child {
     Command::new("phandle")
-        .arg(format!("systat-subprocess{}", i))
+        .arg(format!("systat{}", i))
         .spawn()
         .unwrap()
 }
@@ -28,14 +30,15 @@ impl Stat {
             thread::spawn(move || {
                 let mut child;
                 loop {
-                    child = spawn_process(i);
-                    child.wait().unwrap();
+                    child = spawn(i);
+                    let _ = child.wait();
                     unsafe { S = i };
                 }
             });
         }
         st
     }
+
     pub fn fetch(&mut self, value: &System) {
         self.s = (self.f)(value);
     }

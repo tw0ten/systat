@@ -194,9 +194,9 @@ fn main() {
             //WIFI
             |_| match File::open("/proc/net/wireless") {
                 Ok(mut file) => {
-                    let mut contents = String::new();
-                    let _ = file.read_to_string(&mut contents);
-                    let s = contents.split("\n").collect::<Vec<_>>()[2];
+                    let mut s = String::new();
+                    let _ = file.read_to_string(&mut s);
+                    let s = s.split("\n").collect::<Vec<_>>()[2];
                     if s.len() < 3 {
                         return String::from("󰤯");
                     }
@@ -217,21 +217,17 @@ fn main() {
             },
             5,
         ),
-        Stat::new(
+        /*Stat::new(
             //BLUETOOTH
             |_| String::from("󰂯"),
             10,
-        ),
+        ),*/
         Stat::new(|_| String::from("|"), 0),
         Stat::new(
             //KEYBOARD
-            |_| match Command::new("sh")
-                .arg("-c")
-                .arg("xkb-switch | cut -d '(' -f 1")
-                .output()
-            {
+            |_| match Command::new("xkb-switch").output() {
                 Ok(s) => String::from_utf8_lossy(&s.stdout).trim().to_string(),
-                _ => String::from("--"),
+                _ => String::from("-"),
             },
             -3,
         ),
@@ -261,31 +257,20 @@ fn main() {
         }
     }
 
-    let mut i: u8 = 0;
-
+    let mut i: i8 = 0;
     loop {
-        sleep(INTERVAL);
-        let sig: i8 = unsafe { S };
-        if sig != 0 {
-            unsafe { S = 0 };
-            let mut s: String = String::new();
-            for stat in &mut stats {
-                if stat.i == sig {
-                    stat.fetch(&sys);
-                }
-                s += &stat.s;
-            }
-            setbar(s);
-        }
-        let mut s: String = String::new();
+        let sig = unsafe { S };
+        unsafe { S = 0 };
+        let mut s = String::new();
         for stat in &mut stats {
-            if stat.i > 0 && i % stat.i as u8 == 0 {
+            if (stat.i > 0 && i % stat.i == 0) || (stat.i < 0 && stat.i == sig) {
                 stat.fetch(&sys);
             }
             s += &stat.s;
         }
-        i = i.wrapping_add(1);
         setbar(s);
+        i = i.wrapping_add(1);
+        sleep(INTERVAL);
     }
 }
 
