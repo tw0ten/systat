@@ -1,4 +1,3 @@
-use nix::sys::wait::waitpid;
 use std::process::{Child, Command};
 use std::thread;
 use systemstat::System;
@@ -11,39 +10,32 @@ pub struct Stat {
     pub i: i8,
 }
 
-const SUBPROCESS_NAME: &str = "systat-subprocess";
+fn spawn_process(i: i8) -> Child {
+    Command::new("phandle")
+        .arg(format!("systat-subprocess{}", i))
+        .spawn()
+        .unwrap()
+}
 
 impl Stat {
-    fn spawn_process(i: i8) -> Child {
-        Command::new("dummy")
-            .arg(format!("{}{}", SUBPROCESS_NAME, i))
-            .spawn()
-            .expect(&format!("couldnt start {}{}", SUBPROCESS_NAME, i))
-    }
-
     pub fn new(f: fn(&System) -> String, i: i8) -> Self {
-        let st: Stat = Stat {
+        let st = Stat {
             s: String::new(),
             f,
             i,
         };
         if i < 0 {
             thread::spawn(move || {
-                let mut child: Child = Self::spawn_process(i);
+                let mut child;
                 loop {
-                    match waitpid(Some(nix::unistd::Pid::from_raw(child.id() as i32)), None) {
-                        Ok(_) => {
-                            unsafe { S = i };
-                            child = Self::spawn_process(i);
-                        }
-                        Err(_) => {}
-                    }
+                    child = spawn_process(i);
+                    child.wait().unwrap();
+                    unsafe { S = i };
                 }
             });
         }
-        return st;
+        st
     }
-
     pub fn fetch(&mut self, value: &System) {
         self.s = (self.f)(value);
     }

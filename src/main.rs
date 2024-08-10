@@ -1,21 +1,16 @@
-extern crate systemstat;
-
-use chrono::{Datelike, Local, Utc};
-use std::fs::File;
-use std::io::Read;
-use std::process::Command;
-use std::thread;
-use std::time::Duration;
+use chrono::{Datelike, Local};
+use std::{fs::File, io::Read, process::Command};
+use std::{thread::sleep, time::Duration};
 use systemstat::{Platform, System};
 
 mod stat;
 use stat::Stat;
 
-static mut S: i8 = 0;
+pub static mut S: i8 = 0;
 
 fn main() {
-    let sys: System = System::new();
-    let mut stats: Vec<Stat> = vec![
+    let sys = System::new();
+    let mut stats = vec![
         Stat::new(
             //MOUNT
             |sys| match sys.mount_at("/") {
@@ -23,7 +18,7 @@ fn main() {
                     let s = mount.avail.to_string();
                     return format!("(MNT:{}G)", s[..s.len() - 3].to_string());
                 }
-                Err(_) => String::from("(MNT)"),
+                _ => String::from("(MNT)"),
             },
             30,
         ),
@@ -35,7 +30,7 @@ fn main() {
                     "<RAM:{}",
                     (mem.total.as_u64() - mem.free.as_u64()) * 100 / mem.total.as_u64()
                 ),
-                Err(_) => String::from("<RAM:-"),
+                _ => String::from("<RAM:-"),
             },
             2,
         ),
@@ -46,7 +41,7 @@ fn main() {
                     ":{}%>",
                     (swap.total.as_u64() - swap.free.as_u64()) * 100 / swap.total.as_u64()
                 ),
-                Err(_) => String::from("%>"),
+                _ => String::from("%>"),
             },
             4,
         ),
@@ -55,21 +50,21 @@ fn main() {
             //CPU USAGE + TEMPERATURE
             |sys| match sys.cpu_load_aggregate() {
                 Ok(cpu) => {
-                    thread::sleep(Duration::from_millis(500));
+                    sleep(Duration::from_millis(500));
                     return format!(
                         "CPU:{}%{}°",
                         ((1.0 - cpu.done().unwrap().idle) * 100.0).round(),
                         match Command::new("sh")
                             .arg("-c")
-                            .arg("sensors | grep Tctl: | awk '{print int($2);}'")
+                            .arg("sensors | grep ^Composite: | sed 's/\\..*//' | sed 's/Composite:.*[+-]//'")
                             .output()
                         {
                             Ok(s) => String::from_utf8_lossy(&s.stdout).trim().to_string(),
-                            Err(_) => String::from("-"),
+                            _ => String::from("-"),
                         }
                     );
                 }
-                Err(_) => String::from("CPU"),
+                _ => String::from("CPU"),
             },
             2,
         ),
@@ -85,7 +80,7 @@ fn main() {
                         .output()
                     {
                         Ok(s) => String::from_utf8_lossy(&s.stdout).trim().to_string(),
-                        Err(_) => String::from("-"),
+                        _ => String::from("-"),
                     },
                     match Command::new("nvidia-smi")
                         .arg("--format=csv,noheader,nounits")
@@ -93,7 +88,7 @@ fn main() {
                         .output()
                     {
                         Ok(s) => String::from_utf8_lossy(&s.stdout).trim().to_string(),
-                        Err(_) => String::from("-"),
+                        _ => String::from("-"),
                     }
                 )
             },
@@ -129,7 +124,7 @@ fn main() {
                     0.0..=0.1 => String::from("󰁺"),
                     _ => String::from("󰂎"),
                 },
-                Err(_) => String::from("󰂎"),
+                _ => String::from("󰂎"),
             },
             10,
         ),
@@ -142,29 +137,30 @@ fn main() {
                     }
                     String::from("-")
                 }
-                Err(_) => String::from("?"),
+                _ => String::from("?"),
             },
             5,
         ),
         Stat::new(|_| String::from("|"), 0),
-        Stat::new(
+        /*Stat::new(
             //VOLUME
             |_| {
                 match Command::new("sh")
-                    .arg("-c")
-                    .arg("amixer sget Master | awk -F\"[][]\" '/Left:/ { gsub(\"%\",\"\"); if($4==\"on\"){ if($2 <= 25) print \"󰕿\"; else if($2 <= 75) print \"󰖀\"; else if($2<=100) print \"󰕾\"; } else print \"󰝟\"; }'")
-                    .output(){
-                    Ok(s) => String::from_utf8_lossy(&s.stdout).trim().to_string(),
-                    Err(_) => String::from("󰝟")
-                }
+                            .arg("-c")
+                            .arg("amixer sget Master | grep \\[on\\] ")
+                            .output(){
+                                //| awk -F\"[][]\" '/Left:/ { gsub(\"%\",\"\"); if($4==\"on\"){ if($2 <= 25) print \"󰕿\"; else if($2 <= 75) print \"󰖀\"; else if($2<=100) print \"󰕾\"; } else print \"󰝟\"; }'
+                                Ok(s) => String::from_utf8_lossy(&s.stdout).trim().to_string(),
+                                _ => String::from("󰝟")
+                            }
             },
             -1,
-        ),
+        ),*/
         Stat::new(
             //BRIGHTNESS
             |_| match Command::new("sh")
                 .arg("-c")
-                .arg("xbacklight -get | awk '{ split($0, o, \".\"); print o[1]; }'")
+                .arg("xbacklight -get | sed 's/\\..*//'")
                 .output()
             {
                 Ok(s) => {
@@ -186,10 +182,10 @@ fn main() {
                             1..=10 => String::from("󱩎"),
                             _ => String::from("󰛩"),
                         },
-                        Err(_) => String::from("󰛩"),
+                        _ => String::from("󰛩"),
                     }
                 }
-                Err(_) => String::from("󰛩"),
+                _ => String::from("󰛩"),
             },
             -2,
         ),
@@ -203,29 +199,21 @@ fn main() {
                     let s = contents.split("\n").collect::<Vec<_>>()[2];
                     if s.len() < 3 {
                         return String::from("󰤯");
-                    };
+                    }
                     let s = s.split_whitespace().collect::<Vec<_>>()[2];
                     let num: Result<u8, _> = s[..s.len() - 1].parse();
                     match num {
-                        Ok(e) => {
-                            if e > 50 {
-                                return String::from("󰤨");
-                            }
-                            if e > 33 {
-                                return String::from("󰤥");
-                            }
-                            if e > 16 {
-                                return String::from("󰤢");
-                            }
-                            if e > 0 {
-                                return String::from("󰤟");
-                            }
-                            String::from("󰤯")
-                        }
-                        Err(_) => String::from("󰤯"),
+                        Ok(n) => match n {
+                            51.. => String::from("󰤨"),
+                            31..=50 => String::from("󰤥"),
+                            17..=30 => String::from("󰤢"),
+                            1..=16 => String::from("󰤟"),
+                            _ => String::from("󰤯"),
+                        },
+                        _ => String::from("󰤯"),
                     }
                 }
-                Err(_) => String::from("󰤯"),
+                _ => String::from("󰤯"),
             },
             5,
         ),
@@ -243,7 +231,7 @@ fn main() {
                 .output()
             {
                 Ok(s) => String::from_utf8_lossy(&s.stdout).trim().to_string(),
-                Err(_) => String::from("--"),
+                _ => String::from("--"),
             },
             -3,
         ),
@@ -255,11 +243,11 @@ fn main() {
                     "{}@{}",
                     match Command::new("whoami").output() {
                         Ok(s) => String::from_utf8_lossy(&s.stdout).trim().to_string(),
-                        Err(_) => String::from("user"),
+                        _ => String::from("user"),
                     },
                     match Command::new("uname").arg("-n").output() {
                         Ok(s) => String::from_utf8_lossy(&s.stdout).trim().to_string(),
-                        Err(_) => String::from("host"),
+                        _ => String::from("host"),
                     }
                 )
             },
@@ -273,19 +261,10 @@ fn main() {
         }
     }
 
-    let mut t: i64 = 0;
     let mut i: u8 = 0;
 
-    fn setroot(s: String) {
-        Command::new("xsetroot")
-            .arg("-name")
-            .arg(s)
-            .output()
-            .expect("failed to $xsetroot -name \"...\"");
-    }
-
     loop {
-        thread::sleep(Duration::from_millis(200));
+        sleep(INTERVAL);
         let sig: i8 = unsafe { S };
         if sig != 0 {
             unsafe { S = 0 };
@@ -296,14 +275,8 @@ fn main() {
                 }
                 s += &stat.s;
             }
-            setroot(s);
+            setbar(s);
         }
-
-        if t + 1 > Utc::now().timestamp() {
-            continue;
-        }
-        t = Utc::now().timestamp();
-
         let mut s: String = String::new();
         for stat in &mut stats {
             if stat.i > 0 && i % stat.i as u8 == 0 {
@@ -312,6 +285,12 @@ fn main() {
             s += &stat.s;
         }
         i = i.wrapping_add(1);
-        setroot(s);
+        setbar(s);
     }
+}
+
+const INTERVAL: Duration = Duration::from_millis(500);
+
+fn setbar(s: String) {
+    let _ = Command::new("xsetroot").arg("-name").arg(s).output();
 }
