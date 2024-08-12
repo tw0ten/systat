@@ -9,10 +9,10 @@ use crate::S;
 pub struct Stat {
     pub s: String,
     f: fn(&System) -> String,
-    pub i: i8,
+    pub i: i16,
 }
 
-fn spawn(i: i8) -> Child {
+fn spawn(i: i16) -> Child {
     Command::new("phandle")
         .arg(format!("systat{}", i))
         .spawn()
@@ -20,7 +20,7 @@ fn spawn(i: i8) -> Child {
 }
 
 impl Stat {
-    pub fn new(f: fn(&System) -> String, i: i8) -> Self {
+    pub fn new(f: fn(&System) -> String, i: i16) -> Self {
         let st = Stat {
             s: String::new(),
             f,

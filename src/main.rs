@@ -1,12 +1,17 @@
 use chrono::{Datelike, Local};
-use std::{fs::File, io::Read, process::Command};
-use std::{thread::sleep, time::Duration};
+use std::{
+    fs::File,
+    io::Read,
+    process::{Command, Stdio},
+    thread::sleep,
+    time::Duration,
+};
 use systemstat::{Platform, System};
 
 mod stat;
 use stat::Stat;
 
-pub static mut S: i8 = 0;
+pub static mut S: i16 = 0;
 
 fn main() {
     let sys = System::new();
@@ -55,9 +60,9 @@ fn main() {
                         "CPU:{}%{}°",
                         ((1.0 - cpu.done().unwrap().idle) * 100.0).round(),
                         match Command::new("sh")
-                            .arg("-c")
-                            .arg("sensors | grep ^Composite: | sed 's/\\..*//' | sed 's/Composite:.*[+-]//'")
-                            .output()
+                        .arg("-c")
+                        .arg("sensors k10temp-pci-00c3 | grep ^Tctl: | sed 's/\\..*//' | sed 's/Tctl:.*[+-]//'")
+                        .output()
                         {
                             Ok(s) => String::from_utf8_lossy(&s.stdout).trim().to_string(),
                             _ => String::from("-"),
@@ -112,19 +117,19 @@ fn main() {
             //BATTERY
             |sys| match sys.battery_life() {
                 Ok(battery) => match battery.remaining_capacity {
-                    0.9..=1.0 => String::from("󰁹"),
-                    0.8..=0.9 => String::from("󰂂"),
-                    0.7..=0.8 => String::from("󰂁"),
-                    0.6..=0.7 => String::from("󰂀"),
-                    0.5..=0.6 => String::from("󰁿"),
-                    0.4..=0.5 => String::from("󰁾"),
-                    0.3..=0.4 => String::from("󰁽"),
-                    0.2..=0.3 => String::from("󰁼"),
-                    0.1..=0.2 => String::from("󰁻"),
-                    0.0..=0.1 => String::from("󰁺"),
+                    0.9.. => String::from("󰁹"),
+                    0.8.. => String::from("󰂂"),
+                    0.7.. => String::from("󰂁"),
+                    0.6.. => String::from("󰂀"),
+                    0.5.. => String::from("󰁿"),
+                    0.4.. => String::from("󰁾"),
+                    0.3.. => String::from("󰁽"),
+                    0.2.. => String::from("󰁼"),
+                    0.1.. => String::from("󰁻"),
+                    0.01.. => String::from("󰁺"),
                     _ => String::from("󰂎"),
                 },
-                _ => String::from("󰂎"),
+                _ => String::from("-"),
             },
             10,
         ),
@@ -142,20 +147,32 @@ fn main() {
             5,
         ),
         Stat::new(|_| String::from("|"), 0),
-        /*Stat::new(
+        Stat::new(
             //VOLUME
-            |_| {
-                match Command::new("sh")
-                            .arg("-c")
-                            .arg("amixer sget Master | grep \\[on\\] ")
-                            .output(){
-                                //| awk -F\"[][]\" '/Left:/ { gsub(\"%\",\"\"); if($4==\"on\"){ if($2 <= 25) print \"󰕿\"; else if($2 <= 75) print \"󰖀\"; else if($2<=100) print \"󰕾\"; } else print \"󰝟\"; }'
-                                Ok(s) => String::from_utf8_lossy(&s.stdout).trim().to_string(),
-                                _ => String::from("󰝟")
-                            }
+            |_| match Command::new("sh")
+                .arg("-c")
+                .arg("awk -F'[[%]' '/\\[on\\]/ { print $2 }' <(amixer sget Master) | head -n 1")
+                .output()
+            {
+                Ok(s) => {
+                    match String::from_utf8_lossy(&s.stdout)
+                        .trim()
+                        .to_string()
+                        .parse::<u8>()
+                    {
+                        Ok(n) => match n {
+                            66.. => String::from("󰕾"),
+                            33.. => String::from("󰖀"),
+                            1.. => String::from("󰕿"),
+                            _ => String::from("󰝟"),
+                        },
+                        _ => String::from("󰝟"),
+                    }
+                }
+                _ => String::from("-"),
             },
             -1,
-        ),*/
+        ),
         Stat::new(
             //BRIGHTNESS
             |_| match Command::new("sh")
@@ -170,22 +187,22 @@ fn main() {
                         .parse::<u8>()
                     {
                         Ok(n) => match n {
-                            91..=100 => String::from("󰛨"),
-                            81..=90 => String::from("󱩖"),
-                            71..=80 => String::from("󱩕"),
-                            61..=70 => String::from("󱩔"),
-                            51..=60 => String::from("󱩓"),
-                            41..=50 => String::from("󱩒"),
-                            31..=40 => String::from("󱩑"),
-                            21..=30 => String::from("󱩐"),
-                            11..=20 => String::from("󱩏"),
-                            1..=10 => String::from("󱩎"),
+                            91.. => String::from("󰛨"),
+                            81.. => String::from("󱩖"),
+                            71.. => String::from("󱩕"),
+                            61.. => String::from("󱩔"),
+                            51.. => String::from("󱩓"),
+                            41.. => String::from("󱩒"),
+                            31.. => String::from("󱩑"),
+                            21.. => String::from("󱩐"),
+                            11.. => String::from("󱩏"),
+                            1.. => String::from("󱩎"),
                             _ => String::from("󰛩"),
                         },
-                        _ => String::from("󰛩"),
+                        _ => String::from("-"),
                     }
                 }
-                _ => String::from("󰛩"),
+                _ => String::from("-"),
             },
             -2,
         ),
@@ -205,23 +222,34 @@ fn main() {
                     match num {
                         Ok(n) => match n {
                             51.. => String::from("󰤨"),
-                            31..=50 => String::from("󰤥"),
-                            17..=30 => String::from("󰤢"),
-                            1..=16 => String::from("󰤟"),
+                            31.. => String::from("󰤥"),
+                            17.. => String::from("󰤢"),
+                            1.. => String::from("󰤟"),
                             _ => String::from("󰤯"),
                         },
-                        _ => String::from("󰤯"),
+                        _ => String::from("-"),
                     }
                 }
-                _ => String::from("󰤯"),
+                _ => String::from("-"),
             },
             5,
         ),
-        /*Stat::new(
+        Stat::new(
             //BLUETOOTH
-            |_| String::from("󰂯"),
-            10,
-        ),*/
+            |_| match Command::new("systemctl")
+                .arg("status")
+                .arg("bluetooth")
+                .stdout(Stdio::null())
+                .status()
+            {
+                Ok(s) => match s.success() {
+                    true => String::from("󰂯"),
+                    _ => String::from("󰂲"),
+                },
+                _ => String::from("-"),
+            },
+            20,
+        ),
         Stat::new(|_| String::from("|"), 0),
         Stat::new(
             //KEYBOARD
@@ -257,7 +285,7 @@ fn main() {
         }
     }
 
-    let mut i: i8 = 0;
+    let mut i: i16 = 0;
     loop {
         let sig = unsafe { S };
         unsafe { S = 0 };
@@ -277,5 +305,5 @@ fn main() {
 const INTERVAL: Duration = Duration::from_millis(500);
 
 fn setbar(s: String) {
-    let _ = Command::new("xsetroot").arg("-name").arg(s).output();
+    let _ = Command::new("xsetroot").arg("-name").arg(s).status();
 }
