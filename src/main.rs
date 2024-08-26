@@ -8,7 +8,7 @@ static mut S: i16 = 0;
 const INTERVAL: Duration = Duration::from_millis(500);
 
 fn setbar(s: &str) {
-    let _ = Command::new("xsetroot").arg("-name").arg(s).status();
+    _ = Command::new("xsetroot").arg("-name").arg(s).status();
 }
 
 fn main() {
@@ -33,7 +33,7 @@ fn main() {
         for stat in &mut stats {
             if match stat.i {
                 0 => false,
-                1.. => i % stat.i == 0,
+                0.. => i % stat.i == 0,
                 _ => stat.i == sig,
             } {
                 stat.f(&sys);

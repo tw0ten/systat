@@ -128,7 +128,7 @@ pub fn get() -> Vec<Stat> {
                     0.3.. => String::from("󰁽"),
                     0.2.. => String::from("󰁼"),
                     0.1.. => String::from("󰁻"),
-                    0.01.. => String::from("󰁺"),
+                    0.0.. => String::from("󰁺"),
                     _ => String::from("󰂎"),
                 },
                 _ => String::from(ERROR),
@@ -138,7 +138,7 @@ pub fn get() -> Vec<Stat> {
         Stat::new(
             //AC
             |sys| match sys.on_ac_power() {
-                Ok(power) => match power {
+                Ok(v) => match v {
                     true => String::new(),
                     _ => String::from("-"),
                 },
