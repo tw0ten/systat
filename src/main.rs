@@ -24,11 +24,8 @@ fn main() {
 
     let mut i: i16 = 0;
     loop {
-        let sig = unsafe {
-            let a = S;
-            S = 0;
-            a
-        };
+        let sig = unsafe { S };
+        unsafe { S = 0 }
         let mut s = String::new();
         for stat in &mut stats {
             if match stat.i {

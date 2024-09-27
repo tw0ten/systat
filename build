@@ -1,5 +1,5 @@
 #!/bin/sh
 cargo build -r
 gcc -o phandle phandle.c
-sudo mv phandle /bin
-sudo cp target/release/systat /usr/bin
+sudo cp target/release/systat /usr/local/bin
+sudo mv phandle /usr/local/bin
