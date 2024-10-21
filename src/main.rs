@@ -8,7 +8,7 @@ static mut S: i16 = 0;
 const INTERVAL: Duration = Duration::from_millis(500);
 
 fn setbar(s: &str) {
-    _ = Command::new("xsetroot").arg("-name").arg(s).status();
+    _ = Command::new("xsetroot").arg("-name").arg(s).status()
 }
 
 fn main() {
@@ -19,7 +19,7 @@ fn main() {
         if stat.i > 0 {
             continue;
         }
-        stat.f(&sys);
+        stat.f(&sys)
     }
 
     let mut i: i16 = 0;
@@ -35,10 +35,10 @@ fn main() {
             } {
                 stat.f(&sys);
             }
-            s.push_str(&stat.s);
+            s.push_str(&stat.s)
         }
         setbar(&s);
         i = i.wrapping_add(1);
-        thread::sleep(INTERVAL);
+        thread::sleep(INTERVAL)
     }
 }
