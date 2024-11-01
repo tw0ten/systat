@@ -11,8 +11,8 @@ use systemstat::Platform;
 
 const ERROR: &str = "#";
 
-pub fn get() -> Vec<Stat> {
-    vec![
+pub fn get() -> [Stat; 23] {
+    [
         Stat::new(
             //MOUNT
             |sys| match sys.mount_at("/") {
