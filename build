@@ -1,5 +1,4 @@
 #!/bin/sh
-cargo build -r
-gcc -o phandle phandle.c
+cargo build --release
+gcc -o /usr/local/bin/phandle phandle.c
 sudo cp target/release/systat /usr/local/bin
-sudo mv phandle /usr/local/bin
