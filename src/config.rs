@@ -9,8 +9,10 @@ use std::{
 };
 use systemstat::Platform;
 
-const ERROR: &str = "#";
+pub const PREFIX: &str = "systat-";
+pub const MANUAL: [&str; 3] = ["volume", "brightness", "keyboard"];
 
+const ERROR: &str = "#";
 pub fn get() -> [Stat; 23] {
 	[
 		Stat::new(
@@ -24,7 +26,7 @@ pub fn get() -> [Stat; 23] {
 			},
 			30,
 		),
-		Stat::new(|_sys| String::from(" "), 0),
+		Stat::new(|_| String::from(" "), 0),
 		Stat::new(
 			//RAM
 			|sys| match sys.memory() {
@@ -49,7 +51,7 @@ pub fn get() -> [Stat; 23] {
 			},
 			4,
 		),
-		Stat::new(|_sys| String::from(" {"), 0),
+		Stat::new(|_| String::from(" {"), 0),
 		Stat::new(
 			//CPU USAGE + TEMPERATURE
 			|sys| -> String {
@@ -57,30 +59,26 @@ pub fn get() -> [Stat; 23] {
 					Ok(cpu) => {
 						sleep(Duration::from_millis(500));
 						format!(
-                            "CPU:{}%{}°",
-                            match cpu.done() {
-                                Ok(v) => ((1.0 - v.idle) * 100.0f32).round().to_string(),
-                                _ => String::from(ERROR),
-                            },
-                            match Command::new("sh")
-                            .arg("-c")
-                            .arg("sensors k10temp-pci-00c3 | grep ^Tctl: | sed 's/\\..*//' | sed 's/Tctl:.*[+-]//'")
-                            .output()
-                            {
-                                Ok(s) => String::from_utf8_lossy(&s.stdout).trim().to_string(),
-                                _ => String::from(ERROR),
-                            }
-                        )
+							"CPU:{}%{}°",
+							match cpu.done() {
+								Ok(v) => ((1.0 - v.idle) * 100.0f32).round().to_string(),
+								_ => String::from(ERROR),
+							},
+							match Command::new("cpu-temp").output() {
+								Ok(s) => String::from_utf8_lossy(&s.stdout).to_string(),
+								_ => String::from(ERROR),
+							},
+						)
 					}
 					_ => String::from("CPU"),
 				}
 			},
 			2,
 		),
-		Stat::new(|_sys| String::from(" "), 0),
+		Stat::new(|_| String::from(" "), 0),
 		Stat::new(
 			//GPU USAGE + TEMPERATURE
-			|_sys| {
+			|_| {
 				format!(
 					"GPU:{}%{}°",
 					match Command::new("nvidia-smi")
@@ -103,10 +101,10 @@ pub fn get() -> [Stat; 23] {
 			},
 			2,
 		),
-		Stat::new(|_sys| String::from("} "), 0),
+		Stat::new(|_| String::from("} "), 0),
 		Stat::new(
 			//DATE & TIME
-			|_sys| {
+			|_| {
 				let t = Local::now();
 				format!(
 					"[{}.{}]",
@@ -116,7 +114,7 @@ pub fn get() -> [Stat; 23] {
 			},
 			1,
 		),
-		Stat::new(|_sys| String::from(" \\"), 0),
+		Stat::new(|_| String::from(" \\"), 0),
 		Stat::new(
 			//BATTERY
 			|sys| match sys.battery_life() {
@@ -148,10 +146,10 @@ pub fn get() -> [Stat; 23] {
 			},
 			5,
 		),
-		Stat::new(|_sys| String::from("|"), 0),
+		Stat::new(|_| String::from("|"), 0),
 		Stat::new(
 			//VOLUME
-			|_sys| match Command::new("pamixer").arg("--get-mute").output() {
+			|_| match Command::new("pamixer").arg("--get-mute").output() {
 				Ok(s) => {
 					if String::from_utf8_lossy(&s.stdout).trim() == "true" {
 						return String::from("󰝟");
@@ -175,7 +173,7 @@ pub fn get() -> [Stat; 23] {
 		),
 		Stat::new(
 			//BRIGHTNESS
-			|_sys| match Command::new("xbacklight").arg("-get").output() {
+			|_| match Command::new("xbacklight").arg("-get").output() {
 				Ok(s) => match String::from_utf8_lossy(&s.stdout).trim().parse::<f64>() {
 					Ok(n) => match n as u8 {
 						91.. => String::from("󰛨"),
@@ -196,10 +194,10 @@ pub fn get() -> [Stat; 23] {
 			},
 			-2,
 		),
-		Stat::new(|_sys| String::from("|"), 0),
+		Stat::new(|_| String::from("|"), 0),
 		Stat::new(
 			//WIFI
-			|_sys| match File::open("/proc/net/wireless") {
+			|_| match File::open("/proc/net/wireless") {
 				Ok(mut file) => {
 					let mut s = String::new();
 					_ = file.read_to_string(&mut s);
@@ -225,7 +223,7 @@ pub fn get() -> [Stat; 23] {
 		),
 		Stat::new(
 			//BLUETOOTH
-			|_sys| match Command::new("systemctl")
+			|_| match Command::new("systemctl")
 				.arg("status")
 				.arg("bluetooth")
 				.stdout(Stdio::null())
@@ -239,19 +237,19 @@ pub fn get() -> [Stat; 23] {
 			},
 			20,
 		),
-		Stat::new(|_sys| String::from("|"), 0),
+		Stat::new(|_| String::from("|"), 0),
 		Stat::new(
 			//KEYBOARD
-			|_sys| match Command::new("xkb-switch").output() {
+			|_| match Command::new("xkb-switch").output() {
 				Ok(s) => String::from_utf8_lossy(&s.stdout).trim().to_string(),
 				_ => String::from(ERROR),
 			},
 			-3,
 		),
-		Stat::new(|_sys| String::from(" \\"), 0),
+		Stat::new(|_| String::from(" \\"), 0),
 		Stat::new(
 			//USER@HOST
-			|_sys| {
+			|_| {
 				format!(
 					"{}@{}",
 					String::from_utf8_lossy(&Command::new("whoami").output().unwrap().stdout)

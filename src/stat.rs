@@ -1,3 +1,4 @@
+use crate::config::{PREFIX, MANUAL};
 use crate::{thread, Command, System, S};
 
 pub struct Stat {
@@ -11,13 +12,14 @@ impl Stat {
 		if i < 0 {
 			thread::spawn(move || loop {
 				_ = Command::new("phandle")
-					.arg(format!("systat{}", i))
+					.arg(format!("{}{}", PREFIX, MANUAL[i.abs() as usize - 1]))
 					.spawn()
 					.unwrap()
 					.wait();
 				unsafe { S = i }
 			});
 		}
+
 		Self {
 			s: String::new(),
 			f,
