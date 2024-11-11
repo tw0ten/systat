@@ -3,5 +3,5 @@ name = "systat"
 edition = "2021"
 
 [dependencies]
-chrono = "*"
 systemstat = "*"
+chrono = "*"

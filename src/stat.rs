@@ -1,5 +1,7 @@
-use crate::config::{PREFIX, MANUAL};
-use crate::{thread, Command, System, S};
+use crate::{
+	config::{MANUAL, PREFIX},
+	*,
+};
 
 pub struct Stat {
 	pub i: i16,

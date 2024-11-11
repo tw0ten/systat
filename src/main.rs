@@ -1,18 +1,14 @@
-use std::{process::Command, thread, time::Duration};
-use systemstat::{Platform, System};
-
 mod config;
 mod stat;
+
+use config::set;
+use std::{process::Command, thread, time::Duration};
+use systemstat::{Platform, System};
 
 static mut S: i16 = 0;
 const INTERVAL: Duration = Duration::from_millis(500);
 
-fn setbar(s: &str) {
-	_ = Command::new("xsetroot").arg("-name").arg(s).status()
-}
-
 fn main() {
-	setbar("systat");
 	let mut stats = config::get();
 	let sys = System::new();
 	for stat in &mut stats {
@@ -37,7 +33,7 @@ fn main() {
 			}
 			s.push_str(&stat.s)
 		}
-		setbar(&s);
+		set(&s);
 		i = i.wrapping_add(1);
 		thread::sleep(INTERVAL)
 	}

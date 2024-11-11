@@ -1,19 +1,17 @@
-use crate::stat::Stat;
+use crate::{stat::Stat, *};
 use chrono::{Datelike, Local};
-use std::{
-	fs::File,
-	io::Read,
-	process::{Command, Stdio},
-	thread::sleep,
-	time::Duration,
-};
-use systemstat::Platform;
+use std::{fs::File, io::Read, process::Stdio};
 
 pub const PREFIX: &str = "systat-";
 pub const MANUAL: [&str; 3] = ["volume", "brightness", "keyboard"];
 
+pub fn set(s: &str) {
+	_ = Command::new("xsetroot").arg("-name").arg(s).status()
+}
+
 const ERROR: &str = "#";
 pub fn get() -> [Stat; 23] {
+	set(ERROR);
 	[
 		Stat::new(
 			//MOUNT
@@ -57,7 +55,7 @@ pub fn get() -> [Stat; 23] {
 			|sys| -> String {
 				match sys.cpu_load_aggregate() {
 					Ok(cpu) => {
-						sleep(Duration::from_millis(500));
+						thread::sleep(Duration::from_millis(500));
 						format!(
 							"CPU:{}%{}°",
 							match cpu.done() {
