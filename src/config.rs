@@ -1,24 +1,23 @@
 use crate::{stat::Stat, *};
 use chrono::{Datelike, Local};
 use std::{fs::File, io::Read, process::Stdio};
-
-pub const PREFIX: &str = "systat-";
-pub const MANUAL: [&str; 3] = ["volume", "brightness", "keyboard"];
+use systemstat::ByteSize;
 
 pub fn set(s: &str) {
 	_ = Command::new("xsetroot").arg("-name").arg(s).status()
 }
 
-const ERROR: &str = "#";
+pub const MANUAL: [&str; 4] = ["systat-", "volume", "brightness", "keyboard"];
 pub fn get() -> [Stat; 23] {
+	const ERROR: &str = "#";
 	set(ERROR);
 	[
 		Stat::new(
 			//MOUNT
 			|sys| match sys.mount_at("/") {
 				Ok(v) => {
-					let s = v.avail.to_string();
-					format!("(MNT:{}G)", &s[..s.len() - 3])
+					let s = ByteSize::gib(v.avail.as_u64()).to_string();
+					format!("(MNT:{}G)", &s[0..s.len() - 3])
 				}
 				_ => String::from("(MNT)"),
 			},

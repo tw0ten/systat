@@ -1,5 +1,5 @@
 #!/bin/sh
 cargo build --release
 sudo cp target/release/systat /usr/local/bin
-gcc -o /usr/local/bin/phandle etc/phandle.c
+sudo cc etc/phandle.c -o /usr/local/bin/phandle 
 sudo cp etc/systat-kill /usr/local/bin

@@ -1,7 +1,4 @@
-use crate::{
-	config::{MANUAL, PREFIX},
-	*,
-};
+use crate::{config::MANUAL, *};
 
 pub struct Stat {
 	pub i: i16,
@@ -14,7 +11,7 @@ impl Stat {
 		if i < 0 {
 			thread::spawn(move || loop {
 				_ = Command::new("phandle")
-					.arg(format!("{}{}", PREFIX, MANUAL[i.abs() as usize - 1]))
+					.arg(format!("{}{}", MANUAL[0], MANUAL[i.abs() as usize]))
 					.spawn()
 					.unwrap()
 					.wait();
