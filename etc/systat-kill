@@ -1,2 +1,4 @@
 #!/bin/sh
-pkill -u "$USER" -fx "phandle systat-$*"
+pkill \
+	-u "$USER" \
+	-fx "phandle systat-$*"
