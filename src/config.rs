@@ -7,10 +7,24 @@ pub fn set(s: &str) {
 	_ = Command::new("xsetroot").arg("-name").arg(s).status()
 }
 
+fn notify(t: &str, s: &str, e: usize) {
+	_ = Command::new("notify-send")
+		.arg(t)
+		.arg(s)
+		.arg("-t")
+		.arg(e.to_string())
+		.status()
+}
+
 pub const MANUAL: [&str; 4] = ["systat-", "volume", "brightness", "keyboard"];
 pub fn get() -> [Stat; 23] {
 	const ERROR: &str = "#";
 	set(ERROR);
+	fn shrink(s: String) -> String {
+		let mut s = s.clone();
+		s.shrink_to_fit();
+		s
+	}
 	[
 		Stat::new(
 			//MOUNT
@@ -23,7 +37,7 @@ pub fn get() -> [Stat; 23] {
 			},
 			30,
 		),
-		Stat::new(|_| String::from(" "), 0),
+		Stat::new(|_| shrink(String::from(" ")), 0),
 		Stat::new(
 			//RAM
 			|sys| match sys.memory() {
@@ -48,7 +62,7 @@ pub fn get() -> [Stat; 23] {
 			},
 			4,
 		),
-		Stat::new(|_| String::from(" {"), 0),
+		Stat::new(|_| shrink(String::from(" {")), 0),
 		Stat::new(
 			//CPU USAGE + TEMPERATURE
 			|sys| -> String {
@@ -72,7 +86,7 @@ pub fn get() -> [Stat; 23] {
 			},
 			2,
 		),
-		Stat::new(|_| String::from(" "), 0),
+		Stat::new(|_| shrink(String::from(" ")), 0),
 		Stat::new(
 			//GPU USAGE + TEMPERATURE
 			|_| {
@@ -98,7 +112,7 @@ pub fn get() -> [Stat; 23] {
 			},
 			2,
 		),
-		Stat::new(|_| String::from("} "), 0),
+		Stat::new(|_| shrink(String::from("} ")), 0),
 		Stat::new(
 			//DATE & TIME
 			|_| {
@@ -111,13 +125,22 @@ pub fn get() -> [Stat; 23] {
 			},
 			1,
 		),
-		Stat::new(|_| String::from(" \\"), 0),
+		Stat::new(|_| shrink(String::from(" \\")), 0),
 		Stat::new(
 			//BATTERY
 			|sys| match sys.battery_life() {
-				Ok(battery) => match battery.remaining_capacity {
+				Ok(battery) => match &battery.remaining_capacity {
 					0.0 => String::from("󰂎"),
-					..0.1 => String::from("󰁺"),
+					..0.1 => {
+						if !sys.on_ac_power().unwrap_or(false) {
+							notify(
+								"battery",
+								format!("{}%", (100.0 * battery.remaining_capacity) as u8).as_str(),
+								3000,
+							);
+						}
+						String::from("󰁺")
+					}
 					..0.2 => String::from("󰁻"),
 					..0.3 => String::from("󰁼"),
 					..0.4 => String::from("󰁽"),
@@ -143,7 +166,7 @@ pub fn get() -> [Stat; 23] {
 			},
 			5,
 		),
-		Stat::new(|_| String::from("|"), 0),
+		Stat::new(|_| shrink(String::from("|")), 0),
 		Stat::new(
 			//VOLUME
 			|_| match Command::new("pamixer").arg("--get-mute").output() {
@@ -191,7 +214,7 @@ pub fn get() -> [Stat; 23] {
 			},
 			-2,
 		),
-		Stat::new(|_| String::from("|"), 0),
+		Stat::new(|_| shrink(String::from("|")), 0),
 		Stat::new(
 			//WIFI
 			|_| match File::open("/proc/net/wireless") {
@@ -234,7 +257,7 @@ pub fn get() -> [Stat; 23] {
 			},
 			20,
 		),
-		Stat::new(|_| String::from("|"), 0),
+		Stat::new(|_| shrink(String::from("|")), 0),
 		Stat::new(
 			//KEYBOARD
 			|_| match Command::new("xkb-switch").output() {
@@ -243,11 +266,11 @@ pub fn get() -> [Stat; 23] {
 			},
 			-3,
 		),
-		Stat::new(|_| String::from(" \\"), 0),
+		Stat::new(|_| shrink(String::from(" \\")), 0),
 		Stat::new(
 			//USER@HOST
 			|_| {
-				format!(
+				shrink(format!(
 					"{}@{}",
 					String::from_utf8_lossy(&Command::new("whoami").output().unwrap().stdout)
 						.trim(),
@@ -255,7 +278,7 @@ pub fn get() -> [Stat; 23] {
 						&Command::new("uname").arg("-n").output().unwrap().stdout
 					)
 					.trim()
-				)
+				))
 			},
 			0,
 		),
