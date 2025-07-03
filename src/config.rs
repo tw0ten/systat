@@ -4,7 +4,7 @@ use std::{fs::File, io::Read, process::Stdio};
 use systemstat::ByteSize;
 
 pub fn set(s: &str) {
-	_ = Command::new("xsetroot").arg("-name").arg(s).status()
+	_ = Command::new("echo").arg(s).status()
 }
 
 fn notify(t: &str, s: &str, e: usize) {
@@ -20,84 +20,88 @@ pub const MANUAL: [&str; 4] = ["systat-", "volume", "brightness", "keyboard"];
 pub fn get() -> [Stat; 23] {
 	const ERROR: &str = "#";
 	set(ERROR);
-	fn shrink(s: String) -> String {
-		let mut s = s.clone();
-		s.shrink_to_fit();
-		s
+
+	fn utf8(i: &[u8]) -> String {
+		String::from_utf8_lossy(i).to_string()
 	}
+
+	fn separator() -> Stat {
+		Stat::new(|_| String::from(" \\"), 0)
+	}
+
 	[
 		Stat::new(
-			//MOUNT
+			// mount
 			|sys| match sys.mount_at("/") {
 				Ok(v) => {
 					let s = ByteSize::gib(v.avail.as_u64()).to_string();
-					format!("(MNT:{}G)", &s[0..s.len() - 3])
+					format!("({}G)", &s[0..s.len() - 3])
 				}
-				_ => String::from("(MNT)"),
+				_ => format!("({})", ERROR),
 			},
 			30,
 		),
-		Stat::new(|_| shrink(String::from(" ")), 0),
+		Stat::new(|_| (String::from(" ")), 0),
 		Stat::new(
-			//RAM
+			// ram
 			|sys| match sys.memory() {
 				Ok(v) => {
 					let t = v.total.as_u64();
-					format!("<RAM:{}", (t - v.free.as_u64()) * 100 / t)
+					format!("<{}", (t - v.free.as_u64()) * 100 / t)
 				}
-				_ => format!("<RAM:{}", ERROR),
+				_ => format!("<{}", ERROR),
 			},
 			2,
 		),
 		Stat::new(
-			//SWAP
+			// swap
 			|sys| -> String {
 				match sys.swap() {
 					Ok(swap) => match swap.total.as_u64() {
 						0 => String::from("%>"),
-						v => format!(":{}%>", (v - swap.free.as_u64()) * 100 / v),
+						v => format!("+{}%>", (v - swap.free.as_u64()) * 100 / v),
 					},
-					_ => format!(":{}%>", ERROR),
+					_ => format!("+{}%>", ERROR),
 				}
 			},
 			4,
 		),
-		Stat::new(|_| shrink(String::from(" {")), 0),
+		Stat::new(|_| (String::from(" {")), 0),
 		Stat::new(
-			//CPU USAGE + TEMPERATURE
+			// cpu usage + temperature
 			|sys| -> String {
 				match sys.cpu_load_aggregate() {
 					Ok(cpu) => {
 						thread::sleep(Duration::from_millis(500));
 						format!(
-							"CPU:{}%{}°",
+							"c={}%{}°",
 							match cpu.done() {
 								Ok(v) => ((1.0 - v.idle) * 100.0f32).round().to_string(),
 								_ => String::from(ERROR),
 							},
 							match Command::new("cpu-temp").output() {
-								Ok(s) => String::from_utf8_lossy(&s.stdout).to_string(),
+								Ok(s) => utf8(&s.stdout).to_string(),
 								_ => String::from(ERROR),
 							},
 						)
 					}
-					_ => String::from("CPU"),
+					_ => String::from("c"),
 				}
 			},
 			2,
 		),
-		Stat::new(|_| shrink(String::from(" ")), 0),
+		separator(),
 		Stat::new(
-			//GPU USAGE + TEMPERATURE
+			// gpu usage + temperature
 			|_| {
 				format!(
-					"GPU:{}%{}°",
+					"g={}%{}°",
 					match Command::new("nvidia-smi")
 						.arg("--format=csv,noheader,nounits")
 						.arg("--query-gpu=utilization.gpu")
 						.output()
 					{
-						Ok(s) => String::from_utf8_lossy(&s.stdout).trim().to_string(),
+						Ok(s) => utf8(&s.stdout).trim().to_string(),
 						_ => String::from(ERROR),
 					},
 					match Command::new("nvidia-smi")
@@ -105,29 +109,30 @@ pub fn get() -> [Stat; 23] {
 						.arg("--query-gpu=temperature.gpu")
 						.output()
 					{
-						Ok(s) => String::from_utf8_lossy(&s.stdout).trim().to_string(),
+						Ok(s) => utf8(&s.stdout).trim().to_string(),
 						_ => String::from(ERROR),
 					}
 				)
 			},
 			2,
 		),
-		Stat::new(|_| shrink(String::from("} ")), 0),
+		Stat::new(|_| (String::from("} ")), 0),
 		Stat::new(
-			//DATE & TIME
+			// date & time
 			|_| {
 				let t = Local::now();
 				format!(
-					"[{}.{}]",
+					"[{}-{}|{}]",
+					t.format("%y/%m/%d"),
 					t.weekday().num_days_from_sunday(),
-					t.format("%d/%m|%H:%M")
+					t.format("%H:%M"),
 				)
 			},
 			1,
 		),
-		Stat::new(|_| shrink(String::from(" \\")), 0),
+        separator(),
 		Stat::new(
-			//BATTERY
+			// battery
 			|sys| match sys.battery_life() {
 				Ok(battery) => match &battery.remaining_capacity {
 					0.0 => String::from("󰂎"),
@@ -156,7 +161,7 @@ pub fn get() -> [Stat; 23] {
 			10,
 		),
 		Stat::new(
-			//AC
+			// ac
 			|sys| match sys.on_ac_power() {
 				Ok(v) => match v {
 					true => String::new(),
@@ -166,16 +171,16 @@ pub fn get() -> [Stat; 23] {
 			},
 			5,
 		),
-		Stat::new(|_| shrink(String::from("|")), 0),
+		Stat::new(|_| (String::from("|")), 0),
 		Stat::new(
-			//VOLUME
+			// volume
 			|_| match Command::new("pamixer").arg("--get-mute").output() {
 				Ok(s) => {
-					if String::from_utf8_lossy(&s.stdout).trim() == "true" {
+					if utf8(&s.stdout).trim() == "true" {
 						return String::from("󰝟");
 					}
 					match Command::new("pamixer").arg("--get-volume").output() {
-						Ok(n) => match String::from_utf8_lossy(&n.stdout).trim().parse::<u8>() {
+						Ok(n) => match utf8(&n.stdout).trim().parse::<u8>() {
 							Ok(n) => match n {
 								0 => String::from("󰝟"),
 								..33 => String::from("󰕿"),
@@ -192,9 +197,9 @@ pub fn get() -> [Stat; 23] {
 			-1,
 		),
 		Stat::new(
-			//BRIGHTNESS
-			|_| match Command::new("xbacklight").arg("-get").output() {
-				Ok(s) => match String::from_utf8_lossy(&s.stdout).trim().parse::<f64>() {
+			// brightness
+			|_| match Command::new("brightnessctl").arg("get").output() {
+				Ok(s) => match utf8(&s.stdout).trim().parse::<f64>() {
 					Ok(n) => match n as u8 {
 						91.. => String::from("󰛨"),
 						81.. => String::from("󱩖"),
@@ -214,9 +219,9 @@ pub fn get() -> [Stat; 23] {
 			},
 			-2,
 		),
-		Stat::new(|_| shrink(String::from("|")), 0),
+		Stat::new(|_| (String::from("|")), 0),
 		Stat::new(
-			//WIFI
+			// wifi
 			|_| match File::open("/proc/net/wireless") {
 				Ok(mut file) => {
 					let mut s = String::new();
@@ -242,7 +247,7 @@ pub fn get() -> [Stat; 23] {
 			5,
 		),
 		Stat::new(
-			//BLUETOOTH
+			// bluetooth
 			|_| match Command::new("systemctl")
 				.arg("status")
 				.arg("bluetooth")
@@ -257,28 +262,24 @@ pub fn get() -> [Stat; 23] {
 			},
 			20,
 		),
-		Stat::new(|_| shrink(String::from("|")), 0),
+		Stat::new(|_| (String::from("|")), 0),
 		Stat::new(
-			//KEYBOARD
+			// keyboard
 			|_| match Command::new("xkb-switch").output() {
-				Ok(s) => String::from_utf8_lossy(&s.stdout).trim().to_string(),
+				Ok(s) => utf8(&s.stdout).trim().to_string(),
 				_ => String::from(ERROR),
 			},
 			-3,
 		),
-		Stat::new(|_| shrink(String::from(" \\")), 0),
+		separator(),
 		Stat::new(
-			//USER@HOST
+			// user@host
 			|_| {
-				shrink(format!(
+				format!(
 					"{}@{}",
-					String::from_utf8_lossy(&Command::new("whoami").output().unwrap().stdout)
-						.trim(),
-					String::from_utf8_lossy(
-						&Command::new("uname").arg("-n").output().unwrap().stdout
-					)
-					.trim()
-				))
+					utf8(&Command::new("whoami").output().unwrap().stdout).trim(),
+					utf8(&Command::new("uname").arg("-n").output().unwrap().stdout).trim()
+				)
 			},
 			0,
 		),
